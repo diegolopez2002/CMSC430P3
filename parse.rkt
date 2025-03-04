@@ -11,11 +11,11 @@
      (If (parse e1) (parse e2) (parse e3))]
     [(list 'cond (list 'else e)) (Cond '() (parse e))]
     [(list 'cond (list p e) rest ... (list 'else exp))
-     (Cond (flatten (list (Clause (parse p) (parse e)) (parse-clause rest ))) (parse exp))]
+     (Cond (flatten (list (Clause (parse p) (parse e)) (parse-clause rest))) (parse exp))]
     [(list 'case e (list 'else el)) (Case (parse e) '() (parse el))]
     [(list 'case e (list datums result) rest ... (list 'else el))
-     (Case (parse e) (flatten (list (Clause datums (parse result)) (parse-datum rest))) (parse el ))]
-    [_ (error "Parsing Error")]))
+     (Case (parse e) (flatten (list (Clause datums (parse result)) (parse-datum rest))) (parse el))]
+    [_ (error "Parse error")]))
 
 (define (parse-clause cs)
   (match cs
