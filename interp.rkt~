@@ -1,0 +1,60 @@
+#lang racket
+(provide interp)
+(require "ast.rkt")
+(require "interp-prim.rkt")
+
+;; type Value =
+;; | Integer
+;; | Boolean
+
+;; Expr -> Value
+(define (interp e)
+  (match e
+    ;; Literal values
+    [(Lit d) d]
+    
+    ;; Handle unary operations (e.g., abs, -, not)
+    [(Prim1 p e)
+     (interp-prim1 p (interp e))]
+    
+    ;; Handle 'if' expression
+    [(If e1 e2 e3)
+     (if (interp e1)
+         (interp e2)
+         (interp e3))]
+    
+    ;; Handle 'cond' expression
+    [(Cond clauses else-clause)
+     (interp-cond clauses else-clause)]
+    
+    ;; Handle 'case' expression
+    [(Case ev clauses else-clause)
+     (interp-case ev clauses else-clause)]))
+
+;; Interpreting a 'cond' expression: it checks each clause's predicate and returns the branch if the predicate is truthy
+(define (interp-cond clauses else-clause)
+  (define (eval-clauses clauses)
+    (match clauses
+      [(list) (interp else-clause)]  ; If no more clauses, evaluate the else clause
+      [(list (Clause pred branch) . rest)
+       (if (not (equal? (interp pred) #f))
+           (interp branch)          ; If predicate is truthy, return the branch
+           (eval-clauses rest))]))   ; Otherwise, evaluate the rest of the clauses
+  (eval-clauses clauses))
+
+;; Interpreting a 'case' expression: it compares the subject to each clause's datums and returns the branch if there's a match
+(define (interp-case ev clauses else-clause)
+  (define (match-clause clause)
+    (match clause
+      [(CaseClause datums branch)
+       (if (memv (interp ev) datums)
+           (interp branch)   ; If the subject matches any datum, evaluate the branch
+           #f)]))           ; Otherwise, return #f
+  (define (eval-clauses clauses)
+    (match clauses
+      [(list) (interp else-clause)]  ; If no match, evaluate the else clause
+      [(list clause . rest)
+       (if (match-clause clause)
+           (match-clause clause)   ; If matched, evaluate the branch
+           (eval-clauses rest))]))  ; Otherwise, check the next clause
+  (eval-clauses clauses))

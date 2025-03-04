@@ -1,0 +1,90 @@
+#lang racket
+(provide (all-defined-out))
+(require "ast.rkt")
+(require "compile-ops.rkt")
+(require "types.rkt")
+(require a86/ast)
+
+(define rax 'rax)
+
+;; Expr -> Asm
+(define (compile e)
+  (prog (Global 'entry)
+        (Label 'entry)
+        (compile-e e)
+        (Ret)))
+
+;; Expr -> Asm
+(define (compile-e e)
+  (match e
+    [(Lit d)         (compile-value d)]
+    [(Prim1 p e)     (compile-prim1 p e)]
+    [(Cond clauses else-clause)  (compile-cond clauses else-clause)]  ;; Handle cond
+    [(Case ev clauses else-clause) (compile-case ev clauses else-clause)]  ;; Handle case
+    [(If e1 e2 e3)
+     (compile-if e1 e2 e3)]))
+
+;; Value -> Asm
+(define (compile-value v)
+  (seq (Mov rax (value->bits v))))
+
+;; Op1 Expr -> Asm
+(define (compile-prim1 p e)
+  (seq (compile-e e)
+       (compile-op1 p)))
+
+;; Expr Expr Expr -> Asm
+(define (compile-if e1 e2 e3)
+  (let ((l1 (gensym 'if))
+        (l2 (gensym 'if)))
+    (seq (compile-e e1)
+         (Cmp rax (value->bits #f))
+         (Je l1)
+         (compile-e e2)
+         (Jmp l2)
+         (Label l1)
+         (compile-e e3)
+         (Label l2))))
+
+;; Cond clauses -> Asm
+(define (compile-cond clauses else-clause)
+  (define (compile-clause clause l1)
+    (match clause
+      [(Clause pred branch)
+       (seq (compile-e pred)
+            (Cmp rax (value->bits #f))
+            (Je l1)
+            (compile-e branch))]))
+  
+  (let ((l2 (gensym 'cond)))
+    (foldl (lambda (clause acc)
+             (let ((l1 (gensym 'cond)))
+               (seq acc
+                    (compile-clause clause l1)
+                    (Label l1)))
+           (seq (compile-e else-clause)
+                (Label l2)))))
+  
+  (Label l2))
+
+;; Case expr -> Asm
+(define (compile-case ev clauses else-clause)
+  (let ((l1 (gensym 'case)))
+    (seq (compile-e ev)
+         (Label l1)
+         (foldl (lambda (clause acc)
+                  (let ((l2 (gensym 'case)))
+                    (seq acc
+                         (compile-case-clause clause l2)
+                         (Label l2)))
+                (seq (compile-e else-clause)))))))
+
+;; CaseClause -> Asm
+(define (compile-case-clause clause l1)
+  (match clause
+    [(CaseClause datums branch)
+     (seq (for-each (lambda (datum)
+                      (seq (Cmp rax (value->bits datum))
+                           (Jne l1)))
+                    datums)
+          (compile-e branch))]))

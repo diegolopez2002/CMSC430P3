@@ -1,0 +1,41 @@
+#lang racket
+(provide parse)
+(require "ast.rkt")
+
+;; S-Expr -> Expr
+(define (parse s)
+  (match s
+    ;; Literal datum (Integer or Boolean)
+    [(? datum?)          (Lit s)]
+    
+    ;; Parsing unary operations (add1, sub1, zero?)
+    [(list (? op1? o) e) (Prim1 o (parse e))]
+    
+    ;; Parsing if expressions
+    [(list 'if e1 e2 e3)
+     (If (parse e1) (parse e2) (parse e3))]
+    
+    ;; Parsing cond expressions (with correct pattern matching)
+    [(list 'cond . clauses)
+     (Cond (map (λ (clause)
+                 (Clause (parse (first clause)) (parse (second clause)))))
+           (take-while (λ (x) (not (eq? (first x) 'else))) clauses))
+           (parse (last clauses))])
+    
+    ;; Parsing case expressions
+    [(list 'case ev . clauses)
+     (Case (parse ev)
+           (map (λ (clause)
+                  (Clause (map parse (first clause)) (parse (second clause))))
+                clauses)
+           (parse (last clauses)))])
+
+
+
+;; Any -> Boolean
+(define (datum? x)
+  (or (exact-integer? x)
+      (boolean? x)))
+
+(define (op1? x)
+  (memq x '(add1 sub1 zero? abs - not)))

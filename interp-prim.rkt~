@@ -1,0 +1,16 @@
+#lang racket
+(provide interp-prim1)
+
+;; Op Value -> Value
+(define (interp-prim1 op v)
+  (match op
+    ['add1  (add1 v)]        ; Handle 'add1 operation
+    ['sub1  (sub1 v)]        ; Handle 'sub1 operation
+    ['zero? (zero? v)]       ; Handle 'zero? operation
+    
+    ;; Handle new primitives:
+    ['abs   (abs v)]         ; Handle 'abs operation (absolute value)
+    ['-     (- 0 v)]         ; Handle '-' operation (negation)
+    ['not   (if v #f #t)]    ; Handle 'not operation (logical negation)
+    
+    [_ (error "Unknown operator" op)]))  ; Catch-all for unknown operators
